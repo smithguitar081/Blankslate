@@ -3,15 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BLANKSLATE — Generative AI Policy</title>
+  <title>BLANKSLATE — Artists</title>
   <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
   <style>* { box-sizing: border-box; margin: 0; padding: 0; } body { background: #fff; color: #000; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }</style>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js"></script>
 </head>
 <body>
   <div id="root"></div>
   <script type="text/babel" src="Nav.jsx"></script>
+  <script type="text/babel" src="Hero3D.jsx"></script>
   <script type="text/babel">
     const Footer = () => (
       <footer style={{ padding: '20px 40px', borderTop: '1px solid #ddd', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem' }}>
@@ -27,13 +31,25 @@
       </footer>
     );
 
-    const paragraphs = [
-      `We strictly prohibit the use of any content owned and/or controlled by Blankslate (including Blank Slate Records, and other associated companies) ("BSR Content"), now and in the future —including but not limited to recordings, audio visual recordings, artwork, names, likenesses, imagery, lyrics, compositions, and associated metadata—for the training or development of generative AI models. This includes machine learning algorithms, large language models, and other AI systems used to generate or synthesise music, audio, text, or images.`,
-      `BSR Content may not be used for any form of text and data mining, AI training, web scraping, data extraction, alteration, or the creation of derivative works. All materials distributed by our label are protected by copyright law and are not licensed—explicitly or implicitly—for inclusion in datasets used to train or fine-tune AI technologies.`,
-      `We expressly reserve all rights related to the use of BSR Content throughout the World, including without limitation those granted under Article 4 of the EU Directive 2019/790/EC, to the fullest extent permitted by law.`,
-      `We stand firmly for the integrity of human creativity and the right of artists to control how their work is used. We actively monitor the misuse of our intellectual property and will take appropriate legal action against unauthorised AI training, data scraping, or ingestion of our materials.`,
-      `If you want to use BSR Content for any AI purpose, you must contact us in advance to request a license by emailing blankslaterecords@proton.me. Any such license may be withheld or denied in our sole discretion.`,
+    const artists = [
+      { name: 'John Smith',  role: 'Producer/Artist', href: 'john-smith.html' },
+      { name: 'The Uncuts',  role: 'Artist',           href: 'the-uncuts.html' },
+      { name: 'Blue Sunday', role: 'Artist',           href: 'blue-sunday.html' },
+      { name: 'Truong',      role: 'Artist',           href: 'truong.html' },
     ];
+
+    const ArtistCard = ({ name, role, href }) => {
+      const [hovered, setHovered] = React.useState(false);
+      return (
+        <a href={href} style={{ textDecoration: 'none' }}>
+          <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+            style={{ border: '1px solid', borderColor: hovered ? '#000' : '#ddd', padding: '32px 40px', cursor: 'pointer', transition: 'border-color 0.3s', textAlign: 'left' }}>
+            <div style={{ fontSize: '1.3rem', fontWeight: 400, letterSpacing: 1, color: '#000', marginBottom: 6 }}>{name}</div>
+            <div style={{ fontSize: '0.9rem', color: '#999', fontWeight: 400 }}>{role}</div>
+          </div>
+        </a>
+      );
+    };
 
     const App = () => {
       const contentRef = React.useRef(null);
@@ -76,22 +92,13 @@
 
       return (
         <div>
-          <Nav />
+          <Nav active="Artists" />
           <div style={{ paddingTop: 70 }}>
-            <section style={{
-              backgroundImage: "url('glass-head-inverted.png')",
-              backgroundSize: 'cover', backgroundPosition: 'center',
-              backgroundAttachment: 'fixed', height: '100vh',
-              position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center',
-            }}>
-              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }} />
-              <h1 style={{ position: 'relative', zIndex: 1, fontSize: 'clamp(2rem, 6vw, 5rem)', fontWeight: 400, color: '#fff', letterSpacing: '-1px', textAlign: 'center', margin: 0, lineHeight: 1 }}>Generative AI Policy</h1>
-            </section>
+            <Hero3D title="Artists" axis="x" zoom={1.8} />
             <section ref={contentRef} style={{ maxWidth: 680, margin: '0 auto', padding: '80px 40px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-                {paragraphs.map((p, i) => (
-                  <p key={i} style={{ fontSize: '1rem', color: '#333', lineHeight: 1.9, fontWeight: 400 }}>{p}</p>
-                ))}
+              <h1 style={{ fontSize: '2.5rem', fontWeight: 400, color: '#000', marginBottom: 48, textAlign: 'center' }}>Artists</h1>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {artists.map(a => <ArtistCard key={a.name} {...a} />)}
               </div>
             </section>
             <Footer />
