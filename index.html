@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BLANKSLATE</title>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #fff; color: #000; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
+    #hero-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; }
+    .hero-wrapper { position: relative; width: 100%; height: calc(100vh - 70px); overflow: hidden; background: #000; }
+    .hero-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; pointer-events: none; }
+    .hero-title { font-size: clamp(2.625rem, 7vw, 4.375rem); color: #fff; font-weight: 700; font-style: italic; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; letter-spacing: -12px; margin: 0; }
+    .hero-sub { font-size: clamp(0.9rem, 3vw, 1.2rem); color: rgba(255,255,255,0.6); margin-top: 10px; font-weight: 400; }
+    .hero-cta {
+      position: absolute; left: 0; right: 0; bottom: 48px;
+      display: flex; gap: 18px; justify-content: center;
+      pointer-events: auto;
+    }
+    .hero-cta a {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 180px; padding: 14px 28px;
+      color: #fff; background: transparent;
+      border: 1px solid rgba(255,255,255,0.7);
+      text-decoration: none; letter-spacing: 2px; text-transform: uppercase;
+      font-size: 0.85rem; font-weight: 400;
+      transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+    }
+    .hero-cta a:hover { background: #fff; color: #000; border-color: #fff; }
+    @media (max-width: 600px) {
+      .hero-wrapper { height: calc(100svh - 70px); }
+      .hero-cta { bottom: 32px; gap: 12px; padding: 0 16px; }
+      .hero-cta a { min-width: 0; flex: 1; padding: 12px 16px; font-size: 0.75rem; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel" src="Nav.jsx"></script>
+  <script type="text/babel">
+    const Hero3D = () => {
+      const canvasRef = React.useRef(null);
+      const wrapperRef = React.useRef(null);
+
+      React.useEffect(() => {
+        const canvas = canvasRef.current;
+        const wrapper = wrapperRef.current;
+        const W = wrapper.clientWidth || window.innerWidth;
+        const H = wrapper.clientHeight || window.innerHeight;
+
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(W, H);
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 0.6;
+        renderer.physicallyCorrectLights = true;
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x050505);
+
+        const camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 100);
+        camera.position.set(0, 0, 2.2);
+
+        const rgbeLoader = new THREE.RGBELoader();
+        const pmrem = new THREE.PMREMGenerator(renderer);
+        pmrem.compileEquirectangularShader();
+        rgbeLoader.load(
+          'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/studio_small_08_1k.hdr',
+          hdrTex => {
+            const envTexture = pmrem.fromEquirectangular(hdrTex).texture;
+            scene.environment = envTexture;
+            hdrTex.dispose();
+            pmrem.dispose();
+          }
+        );
+
+        const ambient = new THREE.AmbientLight(0xffffff, 0.8);
+        scene.add(ambient);
+        const key = new THREE.DirectionalLight(0xffffff, 2.0);
+        key.position.set(2, 3, 4);
+        scene.add(key);
+        const fillLight = new THREE.DirectionalLight(0xaaccff, 0.8);
+        fillLight.position.set(-3, 1, -2);
+        scene.add(fillLight);
+        const rim = new THREE.DirectionalLight(0xffffff, 1.0);
+        rim.position.set(0, -2, -3);
+        scene.add(rim);
+
+        let model = null;
+        let targetX = 0, targetY = 0;
+        let currentX = 0, currentY = 0;
+
+        const onMouseMove = e => {
+          const rect = wrapper.getBoundingClientRect();
+          const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+          const ny = ((e.clientY - rect.top) / rect.height) * 2 - 1;
+          targetY = nx * Math.PI * 0.4;
+          targetX = ny * Math.PI * 0.25;
+        };
+        wrapper.addEventListener('mousemove', onMouseMove);
+
+        const loader = new THREE.GLTFLoader();
+        loader.load(
+          'assets/head2.glb',
+          gltf => {
+            model = gltf.scene;
+            const box = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            model.position.sub(center);
+            model.rotation.order = 'XYZ';
+            model.rotation.x = -Math.PI / 2;
+            model.rotation.z = Math.PI;
+            model.scale.setScalar(4.0 / maxDim);
+            const chromeMat = new THREE.MeshStandardMaterial({
+              color: 0xffffff, metalness: 1.0, roughness: 0.0,
+              envMapIntensity: 1.0, side: THREE.DoubleSide,
+            });
+            model.traverse(child => {
+              if (child.isMesh) { child.material = chromeMat; child.castShadow = false; }
+            });
+            scene.add(model);
+          },
+          null,
+          err => console.error('GLTFLoader error:', err)
+        );
+
+        let animId;
+        const animate = () => {
+          animId = requestAnimationFrame(animate);
+          currentX += (targetX - currentX) * 0.06;
+          currentY += (targetY - currentY) * 0.06;
+          if (model) {
+            model.rotation.x = -Math.PI / 2 + currentX;
+            model.rotation.z = Math.PI + currentY;
+          }
+          renderer.render(scene, camera);
+        };
+        animate();
+
+        const onResize = () => {
+          const w = wrapper.clientWidth, h = wrapper.clientHeight;
+          renderer.setSize(w, h);
+          camera.aspect = w / h;
+          camera.updateProjectionMatrix();
+        };
+        window.addEventListener('resize', onResize);
+
+        return () => {
+          cancelAnimationFrame(animId);
+          window.removeEventListener('resize', onResize);
+          wrapper.removeEventListener('mousemove', onMouseMove);
+          renderer.dispose();
+        };
+      }, []);
+
+      return (
+        <div ref={wrapperRef} className="hero-wrapper">
+          <canvas ref={canvasRef} id="hero-canvas" />
+          <div className="hero-overlay">
+            <h1 className="hero-title" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontStyle: 'italic', fontWeight: 700, fontSize: 'clamp(2.625rem, 7vw, 4.375rem)', letterSpacing: -12, letterSpacing: 0.2, color: '#fff', margin: 0 }}>bl_nk_slate</h1>
+            <p className="hero-sub">The music of tomorrow, today.</p>
+          </div>
+          <div className="hero-cta">
+            <a href="artists.html">Artists</a>
+            <a href="Globe.html">Globe</a>
+          </div>
+        </div>
+      );
+    };
+
+    const BuyButton = ({ label }) => {
+      const [hovered, setHovered] = React.useState(false);
+      return (
+        <a href="#" onClick={e => e.preventDefault()}
+          onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+          style={{
+            display: 'inline-block', marginTop: 10,
+            color: hovered ? '#fff' : '#000', background: hovered ? '#000' : 'transparent',
+            border: '1px solid #000', padding: '10px 20px',
+            textDecoration: 'none', fontSize: '1rem', fontWeight: 400,
+            fontFamily: 'inherit', transition: 'background 0.3s, color 0.3s',
+          }}>{label}</a>
+      );
+    };
+
+    const App = () => (
+      <div>
+        <Nav />
+        <div style={{ paddingTop: 70 }}>
+          <Hero3D />
+
+          <section style={{ padding: '40px 0', textAlign: 'center' }}>
+            <h2 style={{ color: '#000', fontWeight: 400, fontSize: '1.5rem', marginBottom: 16 }}>Now Playing</h2>
+            <audio controls>
+              <source src="mp3/Distress.m4a" type="audio/mp4" />
+            </audio>
+          </section>
+
+          <section style={{ padding: '40px 0', textAlign: 'center' }}>
+            <h2 style={{ color: '#000', fontWeight: 400, fontSize: '1.5rem', marginBottom: 24 }}>Tracks</h2>
+            {[{ title: 'Track One', src: 'mp3/Dishitout.flac' }, { title: 'Track Two', src: 'mp3/instrumental 2 sped.mp3' }].map(t => (
+              <div key={t.title} style={{ margin: '20px 0' }}>
+                <p style={{ color: '#000', fontWeight: 400, marginBottom: 8 }}>{t.title}</p>
+                <audio controls><source src={t.src} /></audio>
+                <br />
+                <BuyButton label="Buy MP3 – $1.00" />
+              </div>
+            ))}
+          </section>
+
+          <div style={{ textAlign: 'center', padding: '60px 0' }}>
+            <img src="assets/BSR head logo.png" alt="BSR Logo" style={{ width: 220, maxWidth: '60%', display: 'block', margin: '0 auto' }} />
+          </div>
+
+          <footer style={{ padding: '20px 24px', borderTop: '1px solid #ddd', display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center', fontSize: '0.9rem' }}>
+            <div style={{ display: 'flex', gap: 24 }}>
+              {[{ label: 'Newsletter', href: 'newsletter.html' }, { label: 'Generative AI Policy', href: 'ai-policy.html' }].map(({ label, href }) => (
+                <a key={label} href={href} style={{ color: '#000', textDecoration: 'none', fontWeight: 400, borderBottom: '1px solid transparent', transition: 'border-color 0.2s' }}
+                  onMouseEnter={e => e.currentTarget.style.borderBottomColor = '#000'}
+                  onMouseLeave={e => e.currentTarget.style.borderBottomColor = 'transparent'}
+                >{label}</a>
+              ))}
+            </div>
+            <span style={{ color: '#999', fontWeight: 400 }}>© 2026 BSR Inc. All Rights Reserved.</span>
+          </footer>
+        </div>
+      </div>
+    );
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
